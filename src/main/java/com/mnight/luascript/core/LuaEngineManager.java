@@ -18,7 +18,7 @@ public class LuaEngineManager {
 
     private LuaEngineManager() {
         // Points to config/lua_scripts
-        this.rootPath = FMLPaths.CONFIGDIR.get().resolve("lua_script");
+        this.rootPath = FMLPaths.GAMEDIR.get().resolve("lua_script");
     }
 
     public void init(){
@@ -26,7 +26,7 @@ public class LuaEngineManager {
         this.globals = JsePlatform.standardGlobals();
 
         // Bind the Event Registry to Lua as a global variable "_REGISTRY"
-        globals.set("_REGISTRY", CoerceJavaToLua.coerce(this));
+        globals.set("_REGISTRY", CoerceJavaToLua.coerce(ScriptEventRegistry.INSTANCE));
 
         // Create folders
         ensureDirectory("server");
@@ -43,6 +43,7 @@ public class LuaEngineManager {
     public void reloadServerScripts(){
         System.out.println("[LuaScript] Reloading SERVER scripts");
         // Important: Clear old listeners!
+        ScriptEventRegistry.INSTANCE.clear();
 
         // Load API wrapper first
         loadApiFile();
@@ -72,16 +73,16 @@ public class LuaEngineManager {
             try {
                 LuaValue chunk = globals.loadfile(file.getAbsolutePath());
                 chunk.call();
-                System.out.println("[LuaScript] Loaded: " + subFolder + "/" + file.getName());
+                System.out.println("[LuaScript] Loaded " + subFolder + "/" + file.getName());
             } catch (Exception e) {
-                System.err.println("[LuaScript] Failed to load: " + file.getName());
+                System.err.println("[LuaScript] Failed to load " + file.getName());
                 e.printStackTrace();
             }
         }
     }
 
     private void createApiFile(){
-        File apiFile = rootPath.resolve("api.json").toFile();
+        File apiFile = rootPath.resolve("api.lua").toFile();
         if(!apiFile.exists()){
             try {
                 String content =
@@ -99,7 +100,7 @@ public class LuaEngineManager {
     }
 
     private void loadApiFile(){
-        File apiFile = rootPath.resolve("api.json").toFile();
+        File apiFile = rootPath.resolve("api.lua").toFile();
         if (apiFile.exists()){
             try {
                 globals.loadfile(apiFile.getAbsolutePath()).call();
