@@ -1,0 +1,5 @@
+{
+  "itemGroup.luascript": "Example Mod Tab",
+  "block.luascript.example_block": "Example Block",
+  "item.luascript.example_item": "Example Item"
+}
