@@ -27,6 +27,8 @@ public class LuaEngineManager {
 
         // Bind the Event Registry to Lua as a global variable "_REGISTRY"
         globals.set("_REGISTRY", CoerceJavaToLua.coerce(ScriptEventRegistry.INSTANCE));
+        globals.set("commands", CoerceJavaToLua.coerce(ScriptCommandRegistry.INSTANCE));
+        globals.set("recipes", CoerceJavaToLua.coerce(ScriptRecipeRegistry.INSTANCE));
 
         // Create folders
         ensureDirectory("server");
@@ -44,6 +46,7 @@ public class LuaEngineManager {
         System.out.println("[LuaScript] Reloading SERVER scripts");
         // Important: Clear old listeners!
         ScriptEventRegistry.INSTANCE.clear();
+        ScriptCommandRegistry.INSTANCE.clear();
 
         // Load API wrapper first
         loadApiFile();

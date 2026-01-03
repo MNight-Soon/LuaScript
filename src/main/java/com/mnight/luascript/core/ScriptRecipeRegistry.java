@@ -1,6 +1,7 @@
 package com.mnight.luascript.core;
 
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -39,7 +40,12 @@ public class ScriptRecipeRegistry {
             try {
                 ShapedRecipeData data = parseShapedData(rawData);
 
-
+                registerShapedRecipe(name, data);
+            } catch (LuaRecipeException e) {
+                System.err.println("LuaMod Error [Recipe: " + name + "]: " + e.getMessage());
+            } catch (Exception e){
+                System.err.println("LuaMod System Error [Recipe: "  + name + "] ");
+                e.printStackTrace();
             }
         });
     }
@@ -103,13 +109,13 @@ public class ScriptRecipeRegistry {
     // ==========================================
 
     private void registerShapedRecipe(String name, ShapedRecipeData data){
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath( "lua_script",name);
+        ResourceLocation id = ResourceLocation.fromNamespaceAndPath( "luascript",name);
 
         ShapedRecipe recipe = new ShapedRecipe(
                 "", // Group
                 CraftingBookCategory.MISC,
                 data.pattern(),
-                data.output
+                data.output()
         );
 
         injectRecipeIntoManager(id, recipe);
@@ -131,21 +137,50 @@ public class ScriptRecipeRegistry {
     private void injectRecipeIntoManager(ResourceLocation id, Recipe<?> recipe){
         if (currentManager == null) return;
         try {
-            Field recipeField = null;
-            try {
-                recipeField = RecipeManager.class.getDeclaredField("recipes");
-            } catch (NoSuchFieldException e) {
-                recipeField = RecipeManager.class.getDeclaredField("byType");
-            }
+           Field byTypeField = getField(RecipeManager.class, "byType","f_44007_");
+           byTypeField.setAccessible(true);
 
-            recipeField.setAccessible(true);
-            Map<RecipeType<?>, Map<ResourceLocation, RecipeHolder<?>>> recipeMap =
-                    (Map<RecipeType<?>, Map<ResourceLocation, RecipeHolder<?>>>) recipeField.get(currentManager);
-            RecipeHolder<?> holder = new RecipeHolder<>(id, (Recipe) recipe);
-            recipeMap.computeIfAbsent(recipe.getType(), t -> new HashMap<>()).put(id, holder);
-            } catch (Exception e){
-                throw new RuntimeException("Injection Failed: " + e.getMessage(), e);
+           Map<RecipeType<?>, Map<ResourceLocation, RecipeHolder<?>>> originalByType =
+                   (Map<RecipeType<?>, Map<ResourceLocation, RecipeHolder<?>>>) byTypeField.get(currentManager);
+
+           Map<RecipeType<?>, Map<ResourceLocation, RecipeHolder<?>>> mutableByType = new HashMap<>(originalByType);
+
+           RecipeHolder<?> holder = new RecipeHolder<>(id, (Recipe) recipe);
+           Map<ResourceLocation, RecipeHolder<?>> typeMap = mutableByType.getOrDefault(recipe.getType(), new HashMap<>());
+           Map<ResourceLocation, RecipeHolder<?>> mutableTypeMap = new HashMap<>(typeMap);
+
+           mutableTypeMap.put(id, holder);
+           mutableByType.put(recipe.getType(), mutableTypeMap);
+
+           byTypeField.set(currentManager, mutableByType);
+
+           Field byNameField = getField(RecipeManager.class, "byName", "f_44006_");
+           byNameField.setAccessible(true);
+
+           Map<ResourceLocation, RecipeHolder<?>> originalByName =
+                   (Map<ResourceLocation, RecipeHolder<?>>) byNameField.get(currentManager);
+
+           Map<ResourceLocation, RecipeHolder<?>> mutableByName = new HashMap<>(originalByName);
+            mutableByName.put(id, holder);
+
+            byNameField.set(currentManager, mutableByName);
+        } catch (Exception e){
+            System.err.println("[LuaScript] Injection Failed for " + id);
+            e.printStackTrace();
         }
+    }
+
+    //Helper
+    private Field getField(Class<?> clazz, String... names) throws NoSuchFieldException{
+        for (String name : names){
+            try {
+                return clazz.getDeclaredField(name);
+            } catch (NoSuchFieldException ignored) {}
+        }
+        throw new NoSuchFieldException("Could not find field: " + Arrays.toString(names));
+    }
+    private Item getItem(String id){
+        return BuiltInRegistries.ITEM.get(ResourceLocation.parse(id));
     }
 
 }

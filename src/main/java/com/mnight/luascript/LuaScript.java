@@ -1,7 +1,9 @@
 package com.mnight.luascript;
 
 import com.mnight.luascript.core.LuaEngineManager;
+import com.mnight.luascript.core.ScriptCommandRegistry;
 import com.mnight.luascript.core.ScriptEventRegistry;
+import com.mnight.luascript.core.ScriptRecipeRegistry;
 import com.mojang.logging.LogUtils;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
@@ -14,15 +16,16 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import org.slf4j.Logger;
 
 // The value here should match an entry in the META-INF/neoforge.mods.toml file
-@Mod(LuaScript.MODID)
+@Mod(LuaScript.MOD_ID)
 public class LuaScript {
     // Define mod id in a common place for everything to reference
-    public static final String MODID = "luascript";
+    public static final String MOD_ID = "luascript";
     // Directly reference a slf4j logger
     private static final Logger LOGGER = LogUtils.getLogger();
     // Create a Deferred Register to hold Blocks which will all be registered under the "luascript" namespace
@@ -37,6 +40,7 @@ public class LuaScript {
         // Note that this is necessary if and only if we want *this* class (LuaScript) to respond directly to events.
         // Do not add this line if there are no @SubscribeEvent-annotated functions in this class, like onServerStarting() below.
         NeoForge.EVENT_BUS.register(this);
+        NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -55,6 +59,9 @@ public class LuaScript {
             @Override
             public void onResourceManagerReload(ResourceManager resourceManager) {
                 LuaEngineManager.INSTANCE.reloadServerScripts();
+
+                ScriptRecipeRegistry.INSTANCE.apply(event.getServerResources().getRecipeManager());
+                System.out.println("[LuaScript] Recipes Injected Successfully!");
             }
         });
     }
@@ -77,5 +84,9 @@ public class LuaScript {
     @SubscribeEvent
     public void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         ScriptEventRegistry.INSTANCE.fire("player_join", event);
+    }
+
+    public void onRegisterCommands(RegisterCommandsEvent event) {
+        ScriptCommandRegistry.INSTANCE.registerAll(event.getDispatcher());
     }
 }
